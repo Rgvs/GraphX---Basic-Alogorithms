@@ -17,15 +17,32 @@ import org.apache.log4j.Level
 object PotentialFriends { 
   def main(args: Array[String]) { 
     /** Create the SparkConf object */ 
-    val conf = new SparkConf().setAppName("TriangleCount") 
+    Logger.getLogger("org").setLevel(Level.OFF)
+    Logger.getLogger("akka").setLevel(Level.OFF)
+    val conf = new SparkConf().setAppName("PotentialFriends") 
     /** Create the SparkContext */ 
     val spark = new SparkContext(conf) 
-    Logger.getLogger("org").setLevel(Level.ERROR)
-    Logger.getLogger("akka").setLevel(Level.ERROR)
-    var graph = GraphLoader.edgeListFile(spark, "./Graph/facebook.edge_list")
- 
+    
+    val t_1 = System.nanoTime()/1000000.0
+    
+    val ps = PartitionStrategy.CanonicalRandomVertexCut
+    
+    var graph:Graph[Int, Int] = GraphLoader.edgeListFile(spark, args(0))
+      .partitionBy(ps)
+
+    if (args(1) == 3)
+      graph = graph.partitionBy(PartitionStrategy.RandomVertexCut)
+    else if (args(1) == 2)
+      graph = graph.partitionBy(PartitionStrategy.EdgePartition1D)
+    else if (args(1) == 1)
+      graph = graph.partitionBy(PartitionStrategy.EdgePartition2D)
+
+    val t0 = System.nanoTime()/1000000.0
+
     val verties = graph.vertices.collect();
-    val vertex = verties(4)._1
+    val rnd = new scala.util.Random
+    val index = 1 + rnd.nextInt(1000)
+    val vertex = verties(index)._1
     println("start vertex "+ vertex) 
     val nbrs = graph.collectNeighborIds(EdgeDirection.Either).collect()
     val vertex_nbrs = nbrs.filter(v => v._1.equals(vertex))(0)._2
@@ -46,14 +63,9 @@ object PotentialFriends {
 
     println("Potetial Friends")
     pf.foreach(println)
-
-
-
+    val t2 = System.nanoTime()/1000000.0
     
-
-
-    
-
+    println("Elapsed time: " + (t0-t_1) +"\t" + (t2 - t0) + "\t"+ (t2-t_1) + "ms\n")
     /** Stop the SparkContext */ 
     spark.stop() 
    } 

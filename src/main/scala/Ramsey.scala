@@ -16,15 +16,31 @@ import org.apache.log4j.Level
 object Ramsey { 
   def main(args: Array[String]) { 
     /** Create the SparkConf object */ 
-    val conf = new SparkConf().setAppName("TriangleCount") 
-    /** Create the SparkContext */ 
-    val spark = new SparkContext(conf) 
     Logger.getLogger("org").setLevel(Level.OFF)
     Logger.getLogger("akka").setLevel(Level.OFF)
-    var graph = GraphLoader.edgeListFile(spark, "../facebook.edge_list")
+    val conf = new SparkConf().setAppName("Ramsey") 
+    /** Create the SparkContext */ 
+    val spark = new SparkContext(conf) 
+    
+    val t_1 = System.nanoTime()/1000000.0
+    
+    val ps = PartitionStrategy.CanonicalRandomVertexCut
+    
+    var graph:Graph[Int, Int] = GraphLoader.edgeListFile(spark, args(0))
+      .partitionBy(ps)
+
+    if (args(1) == 3)
+      graph = graph.partitionBy(PartitionStrategy.RandomVertexCut)
+    else if (args(1) == 2)
+      graph = graph.partitionBy(PartitionStrategy.EdgePartition1D)
+    else if (args(1) == 1)
+      graph = graph.partitionBy(PartitionStrategy.EdgePartition2D)
+
+
+    
     val c_w = new PrintWriter(new File("C.txt"))
     val i_w = new PrintWriter(new File("I.txt"))
-    Thread.sleep(5000)
+    
     def ramsey(G: Graph[Int, Int]): (Queue[Long], Queue[Long]) = {
       val q = new Queue[(Long)]
       val q1 = new Queue[(Long)] 
@@ -36,7 +52,7 @@ object Ramsey {
       
       verties.foreach(v => {
         vertex_maps(v._1) = false
-      })
+     })
       
       //println(stringOf(vertex_maps)+"\n1\n\n")
 
@@ -65,20 +81,18 @@ object Ramsey {
       val c = { if (ci1._1.length > ci2._1.length) ci1._1 else ci2._1 }
       val i = { if (ci1._2.length > ci2._2.length) ci1._2 else ci2._2 }
       
-      println(c.length, i.length)
+      //println(c.length, i.length)
 
       return (c,i)
     }
 
+    val t0 = System.nanoTime()/1000000.0
     println(ramsey(graph)+ " answer")
-
     
+    val t2 = System.nanoTime()/1000000.0
 
+    println("Elapsed time: " + (t0-t_1) +"\t" + (t2 - t0) + "\t"+ (t2-t_1) + "ms\n")
 
-    
-
-
-    
 
     /** Stop the SparkContext */ 
     spark.stop() 
